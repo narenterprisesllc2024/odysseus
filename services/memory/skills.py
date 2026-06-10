@@ -12,6 +12,11 @@ content doesn't churn on every retrieval.
 Ownership: skills declare `owner: <username>` in frontmatter. Single-user
 deployments can leave that blank.
 
+External skill directories (e.g. AionUi's skill library) can be mounted
+read-only via the `EXTRA_SKILLS_DIRS` env var (colon-separated paths).
+Skills from those directories are treated as published, visible to all
+users, and read-only (update/delete operations are rejected).
+
 This module also retains a JSON fallback for any legacy `data/skills.json`
 entries — they're surfaced as read-only `Skill` objects so old data still
 loads while a user migrates them to disk.
@@ -28,6 +33,12 @@ from typing import Dict, Iterable, List, Optional
 from .skill_format import Skill, slugify
 
 logger = logging.getLogger(__name__)
+
+# Directories to skip when walking skill trees (venvs, node_modules, etc.)
+_SKIP_DIRS = frozenset({
+    ".venv", "venv", "node_modules", "__pycache__", ".git", ".tox",
+    ".mypy_cache", ".pytest_cache", "site-packages",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +71,25 @@ def _to_float(x, default: float = 0.0) -> float:
 
 
 class SkillsManager:
-    """Read/write SKILL.md files under <data_dir>/skills/."""
+    """Read/write SKILL.md files under <data_dir>/skills/.
 
-    def __init__(self, data_dir: str):
+    Supports additional read-only skill directories via the
+    ``EXTRA_SKILLS_DIRS`` environment variable (colon-separated absolute
+    paths).  Skills discovered there are surfaced as ``published`` /
+    ``source=external`` and visible to every owner.
+    """
+
+    def __init__(self, data_dir: str, extra_dirs: Optional[List[str]] = None):
         self.data_dir = data_dir
         self.skills_root = os.path.join(data_dir, "skills")
         self.usage_file = os.path.join(self.skills_root, "_usage.json")
         self.legacy_file = os.path.join(data_dir, "skills.json")  # back-compat
+        # Extra read-only skill directories (e.g. AionUi skill library).
+        if extra_dirs is not None:
+            self.extra_dirs: List[str] = [d for d in extra_dirs if d.strip()]
+        else:
+            env = os.environ.get("EXTRA_SKILLS_DIRS", "")
+            self.extra_dirs = [d.strip() for d in env.split(":") if d.strip()]
         os.makedirs(self.skills_root, exist_ok=True)
 
     # ----------------------------------------------------------------------
@@ -153,21 +176,48 @@ class SkillsManager:
         self._save_usage(usage)
 
     # ----------------------------------------------------------------------
+    # External-path helpers
+    # ----------------------------------------------------------------------
+
+    def _is_external(self, path: str) -> bool:
+        """Return True if *path* lives under one of the extra skill dirs."""
+        if not self.extra_dirs:
+            return False
+        real = os.path.realpath(path)
+        for d in self.extra_dirs:
+            prefix = os.path.realpath(d)
+            if real == prefix or real.startswith(prefix + os.sep):
+                return True
+        return False
+
+    # ----------------------------------------------------------------------
     # Disk scan
     # ----------------------------------------------------------------------
 
     def _iter_skill_files(self) -> Iterable[str]:
-        if not os.path.isdir(self.skills_root):
-            return
-        for root, _dirs, files in os.walk(self.skills_root, followlinks=False):
-            if "SKILL.md" in files:
-                yield os.path.join(root, "SKILL.md")
+        roots = [self.skills_root] + self.extra_dirs
+        for root_dir in roots:
+            if not os.path.isdir(root_dir):
+                continue
+            for dirpath, dirnames, files in os.walk(root_dir, followlinks=False):
+                # Prune hidden dirs and known package dirs to avoid
+                # picking up stray SKILL.md files inside .venv etc.
+                dirnames[:] = [
+                    d for d in dirnames
+                    if d not in _SKIP_DIRS and not d.startswith(".")
+                ]
+                if "SKILL.md" in files:
+                    yield os.path.join(dirpath, "SKILL.md")
 
     def _read_skill(self, path: str) -> Optional[Skill]:
         try:
             with open(path, encoding="utf-8") as f:
                 text = f.read()
-            return Skill.from_markdown(text, path=path)
+            sk = Skill.from_markdown(text, path=path)
+            if self._is_external(path):
+                sk.status = "published"
+                sk.source = "external"
+            return sk
         except Exception as e:
             logger.warning(f"Failed to parse {path}: {e}")
             return None
@@ -284,7 +334,11 @@ class SkillsManager:
         # leaked legacy / un-stamped skills to every authenticated user.
         # Hide them now; the owner needs to be backfilled on disk if those
         # skills should be visible to a specific user.
-        return [s for s in entries if s.get("owner") == owner]
+        # Exception: external (mounted read-only) skills are visible to all.
+        return [
+            s for s in entries
+            if s.get("owner") == owner or s.get("source") == "external"
+        ]
 
     # ----------------------------------------------------------------------
     # CRUD — disk-backed

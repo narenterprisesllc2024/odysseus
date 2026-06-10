@@ -661,6 +661,15 @@ def _build_system_prompt(
     except Exception:
         pass
 
+    # --- Sovi persona injection ---
+    try:
+        from src.persona import load_persona
+        _persona_text = load_persona()
+        if _persona_text:
+            agent_prompt = _persona_text + "\n\n" + agent_prompt
+    except Exception:
+        pass
+
     # Document context is kept as a SEPARATE message (not merged into the tool
     # prompt) so the context trimmer doesn't destroy it when truncating the
     # massive tool-description system prompt.

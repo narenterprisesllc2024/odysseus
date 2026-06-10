@@ -29,6 +29,16 @@ services:
       - /etc/sovereign-shared/shared.env:/etc/sovereign-shared/shared.env:ro
       # ── MCP wrapper scripts (container-compatible launchers) ───────
       - ./mcp-wrappers:/app/mcp-wrappers:ro
+    networks:
+      - default
+      # Join the Penpot network so Odysseus can reach the Penpot MCP
+      # container directly (it binds to 127.0.0.1 on the host, so
+      # host.docker.internal cannot reach it).
+      - penpot
     environment:
       # Add host npm-global bin to PATH so node-based MCP servers resolve
       - PATH=/app/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/aionui/.npm-global/bin
+
+networks:
+  penpot:
+    external: true

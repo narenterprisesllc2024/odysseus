@@ -16,12 +16,12 @@
  */
 
 :root {
-  /* Core palette */
-  --bg: #282c34;
-  --fg: #9cdef2;
-  --panel: #111;
-  --border: #355a66;
-  --red: #e06c75;
+  /* Core palette — Sovi Blue branded (Sovereign Era default) */
+  --bg: #02100D;
+  --fg: #E8F4F2;
+  --panel: #0B2925;
+  --border: #1D3637;
+  --red: #10A9FA;
   /* Were `var(--green)` / `var(--warn)` — self-referential, so they
      resolved to invalid and every site fell back to its own literal
      (or, for sites with no fallback, painted as transparent/inherit).
@@ -51,9 +51,9 @@
   --color-recording-hover: #d63031;
   --color-muted: #888;
   --color-muted-alt: #6b7280;
-  --color-accent: #00aaff;
+  --color-accent: #10A9FA;
   --color-agent-active: #00ff00;
-  --color-brand-blue: #3b82f6;
+  --color-brand-blue: #10A9FA;
   --color-blind-orange: #ff9800;
   --color-save-green: var(--color-success);
   --color-link-hover: #66c7ff;

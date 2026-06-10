@@ -179,6 +179,18 @@ class ChatProcessor:
         preface = []
         rag_sources = []
 
+        # --- Sovi persona injection ---
+        try:
+            from src.persona import load_persona
+            _persona_text = load_persona()
+            if _persona_text:
+                preface.append({
+                    "role": "system",
+                    "content": _persona_text,
+                })
+        except Exception:
+            pass
+
         # Add preset system prompt if specified
         if preset_system_prompt:
             preface.append({

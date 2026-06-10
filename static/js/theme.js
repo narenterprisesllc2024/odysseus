@@ -9,6 +9,20 @@ import { makeWindowDraggable } from './windowDrag.js';
 import { snapModalToZone } from './tileManager.js';
 
 export const THEMES = {
+  // ── Sovi branded themes (Sovi Blue #10A9FA) ──
+  'sovereign-era': { bg:'#02100D', fg:'#E8F4F2', panel:'#0B2925', border:'#1D3637', red:'#10A9FA',
+                     advanced: { userBubbleBg:'#0E2A28', aiBubbleBg:'#0B2925', brandColor:'#10A9FA',
+                                 sendBtnBg:'#10A9FA', sendBtnHover:'#1C93EC', inputBg:'#113832',
+                                 inputBorder:'#1D3637', codeBg:'#0B2925', codeFg:'#E8F4F2' } },
+  'cozy-cosmic':   { bg:'#010B14', fg:'#E6F0FA', panel:'#011021', border:'#102B42', red:'#10A9FA',
+                     advanced: { userBubbleBg:'#0A2542', aiBubbleBg:'#011021', brandColor:'#10A9FA',
+                                 sendBtnBg:'#10A9FA', sendBtnHover:'#249CE4', inputBg:'#04192F',
+                                 inputBorder:'#102B42', codeBg:'#011021', codeFg:'#E6F0FA' } },
+  'tropical-light':{ bg:'#FDF8F2', fg:'#2A3540', panel:'#FBF4F0', border:'#EBE8EB', red:'#10A9FA',
+                     advanced: { userBubbleBg:'#E5F4FE', aiBubbleBg:'#FBF4F0', brandColor:'#10A9FA',
+                                 sendBtnBg:'#10A9FA', sendBtnHover:'#1C93EC', inputBg:'#FFFFFF',
+                                 inputBorder:'#EBE8EB', codeBg:'#F3E5D7', codeFg:'#2A3540' } },
+  // ── Classic themes ──
   dark:       { bg:'#282c34', fg:'#9cdef2', panel:'#111111', border:'#355a66', red:'#e06c75' },
   light:      { bg:'#f0ebe3', fg:'#5a5248', panel:'#faf6f0', border:'#d4cdc2', red:'#c47d5a' },
   midnight:   { bg:'#0d1117', fg:'#c9d1d9', panel:'#161b22', border:'#30363d', red:'#f85149' },
@@ -31,7 +45,7 @@ export const THEMES = {
   cute:       { bg:'#fff0f5', fg:'#d4608a', panel:'#fff8fa', border:'#f0c0d0', red:'#ff6b9d' },
 };
 
-const DEFAULT_THEME = 'dark';
+const DEFAULT_THEME = 'sovereign-era';
 const LS_KEY = 'odysseus-theme';
 const CUSTOM_THEMES_KEY = 'odysseus-custom-themes';
 
@@ -46,6 +60,9 @@ const MAX_CUSTOM_THEMES = 8;
 
 // Default background patterns for built-in themes
 const THEME_DEFAULT_PATTERN = {
+  'sovereign-era': 'constellations',
+  'cozy-cosmic':   'rain',
+  'tropical-light':'dots',
   dark:       'none',
   light:      'dots',
   midnight:   'rain',
@@ -62,6 +79,8 @@ const THEME_DEFAULT_PATTERN = {
 
 // Default effect colors for specific themes (overrides --fg)
 const THEME_DEFAULT_EFFECT_COLOR = {
+  'sovereign-era': '#10A9FA',
+  'cozy-cosmic':   '#10A9FA',
   midnight:   '#ffffff',
   organs:     '#451616',
   cute:       '#ff8cb8',
@@ -70,6 +89,8 @@ const THEME_DEFAULT_EFFECT_COLOR = {
 
 // Default effect intensity (0..1) per theme. Any theme not listed defaults to 1.
 const THEME_DEFAULT_INTENSITY = {
+  'sovereign-era': 0.4,
+  'cozy-cosmic':   0.5,
   midnight:   0.5,
   terminal:   0.8,
   organs:     0.65,
@@ -284,8 +305,7 @@ export function applyColors(colors) {
     s.setProperty(css, adv[key] || defaults[key]);
   }
 
-  // Update favicon to match theme accent color
-  _updateFavicon(colors.red || '#e06c75');
+  // Sovi face favicon — static PNG, no per-theme recoloring
 }
 
 // Per-route SVG shape registry — kept in sync with the inline favicon
@@ -326,31 +346,8 @@ const _ROUTE_FAVICON_SHAPES = {
     "<rect x='21' y='8' width='6' height='19' rx='1' fill='none' stroke='__C__' stroke-width='2.5' transform='rotate(8 24 17)'/>",
 };
 
-function _updateFavicon(fg) {
-  const path = (window.location.pathname || '').toLowerCase();
-  const routeShape = _ROUTE_FAVICON_SHAPES[path];
-  let svg;
-  if (routeShape) {
-    svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>${routeShape.split('__C__').join(fg)}</svg>`;
-  } else {
-    svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 4L16 22L6 22Z' fill='${fg}'/><path d='M16 8L16 22L24 22Z' fill='${fg}' opacity='0.6'/><path d='M4 24Q10 20 16 24Q22 28 28 24' stroke='${fg}' stroke-width='2.5' fill='none' stroke-linecap='round'/></svg>`;
-  }
-  const href = 'data:image/svg+xml,' + encodeURIComponent(svg);
-  let link = document.querySelector("link[rel='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/svg+xml';
-    document.head.appendChild(link);
-  }
-  link.href = href;
-  let apple = document.querySelector("link[rel='apple-touch-icon']");
-  if (!apple) {
-    apple = document.createElement('link');
-    apple.rel = 'apple-touch-icon';
-    document.head.appendChild(apple);
-  }
-  apple.href = href;
+function _updateFavicon(_fg) {
+  // Sovi branded — static PNG favicon, no dynamic SVG generation.
 }
 
 // Cache of discovered custom fonts: { "Family Name": [ {file, url, format} ] }
@@ -630,7 +627,7 @@ export function initThemeUI() {
         <span style="background:${c.fg}"></span>
         <span style="background:${c.red}"></span>
       </div>
-      ${name === 'dark' ? 'original' : (name === 'gpt' ? 'GPT' : name)}
+      ${name === 'dark' ? 'original' : name === 'gpt' ? 'GPT' : name === 'sovereign-era' ? 'Sovereign Era' : name === 'cozy-cosmic' ? 'Cozy Cosmic' : name === 'tropical-light' ? 'Tropical Light' : name}
     </div>
   `).join('');
 

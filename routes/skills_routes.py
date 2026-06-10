@@ -1080,6 +1080,9 @@ def setup_skills_routes(skills_manager: SkillsManager) -> APIRouter:
     def _verify_owner(skill: dict, user: Optional[str]):
         if user is None:
             return
+        # External (mounted read-only) skills are visible to all users.
+        if skill.get("source") == "external":
+            return
         # SECURITY: strict check — previously `sk_owner and sk_owner != user`
         # let any user mutate/read a skill that happened to have no owner
         # field (legacy or un-stamped writes), since the truthiness guard

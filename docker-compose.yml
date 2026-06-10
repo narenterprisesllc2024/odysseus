@@ -16,6 +16,9 @@ services:
       # land under /app/.local for the odysseus user. Persist them so a
       # container recreate does not silently remove installed serve engines.
       - ./data/local:/app/.local:z
+      # AionUi skill library — mounted read-only so Odysseus can discover
+      # and surface all 333+ skills without duplicating files on disk.
+      - ${AIONUI_SKILLS_PATH:-/opt/aionui/.claude/skills}:/app/aionui-skills:ro,z
     extra_hosts:
       # Lets the container reach local services on the Docker host, including
       # Ollama at http://host.docker.internal:11434.
@@ -51,6 +54,9 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_PSE_CX=${GOOGLE_PSE_CX:-}
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      # Colon-separated list of extra read-only skill directories to scan.
+      # Skills found there are treated as published and visible to all users.
+      - EXTRA_SKILLS_DIRS=${EXTRA_SKILLS_DIRS:-/app/aionui-skills}
       - SERPER_API_KEY=${SERPER_API_KEY:-}
       # PUID / PGID — the user/group the container drops to before
       # running uvicorn (entrypoint also chowns /app/data + /app/logs

@@ -217,6 +217,20 @@ class SkillsManager:
             if self._is_external(path):
                 sk.status = "published"
                 sk.source = "external"
+                # External skills (e.g. AionUi) may lack frontmatter entirely.
+                # Derive the name from the parent directory if the parser
+                # fell back to the default slug.
+                if sk.name == "skill" or not sk.name:
+                    dirname = os.path.basename(os.path.dirname(path))
+                    sk.name = slugify(dirname, fallback="skill")
+                # Pull a one-line description from the first markdown heading
+                # if the frontmatter didn't provide one.
+                if not sk.description:
+                    for line in text.splitlines():
+                        stripped = line.strip()
+                        if stripped.startswith("# ") and len(stripped) > 2:
+                            sk.description = stripped[2:].strip()
+                            break
             return sk
         except Exception as e:
             logger.warning(f"Failed to parse {path}: {e}")
@@ -237,6 +251,9 @@ class SkillsManager:
         them. If strict owner filtering is enabled and SKILL.md files have no
         owner or an owner from a deleted/test account, the UI appears empty even
         though files still exist. This mirrors the DB legacy-owner sweep.
+
+        External (mounted read-only) skills are skipped — they're visible to
+        all users via the ``source=external`` bypass in ``load()``.
         """
         primary_owner = (primary_owner or "").strip()
         if not primary_owner:
@@ -244,6 +261,8 @@ class SkillsManager:
         valid_owners = set(valid_owners or [])
         changed = 0
         for path in self._iter_skill_files():
+            if self._is_external(path):
+                continue  # external skills are read-only, skip
             sk = self._read_skill(path)
             if not sk:
                 continue
@@ -497,11 +516,15 @@ class SkillsManager:
         the same slug across category directories. The `owner` key in
         `updates` is also ignored — ownership is not an editable field
         via this path; rename or admin tooling is required for that.
+
+        External (mounted read-only) skills cannot be updated.
         """
         for path in self._iter_skill_files():
             sk = self._read_skill(path)
             if not sk or sk.name != skill_id:
                 continue
+            if self._is_external(path):
+                return False  # external skills are read-only
             if (sk.owner or "") != (owner or ""):
                 continue
 
@@ -561,6 +584,8 @@ class SkillsManager:
             sk = self._read_skill(path)
             if not sk or sk.name != skill_id:
                 continue
+            if self._is_external(path):
+                return False  # external skills are read-only
             if (sk.owner or "") != (owner or ""):
                 continue
             skill_dir = os.path.dirname(path)
@@ -600,8 +625,10 @@ class SkillsManager:
             sk = self._read_skill(path)
             if not sk or sk.name != name:
                 continue
-            if (sk.owner or "") != (owner or ""):
-                continue
+            # External skills are visible to all owners.
+            if not self._is_external(path):
+                if (sk.owner or "") != (owner or ""):
+                    continue
             try:
                 with open(path, encoding="utf-8") as f:
                     return f.read()
@@ -616,8 +643,9 @@ class SkillsManager:
             sk = self._read_skill(path)
             if not sk or sk.name != name:
                 continue
-            if (sk.owner or "") != (owner or ""):
-                continue
+            if not self._is_external(path):
+                if (sk.owner or "") != (owner or ""):
+                    continue
             base = os.path.realpath(os.path.dirname(path))
             target = os.path.realpath(os.path.join(base, ref_path))
             if os.path.commonpath([base, target]) != base or target == os.path.dirname(path):

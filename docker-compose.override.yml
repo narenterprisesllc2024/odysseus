@@ -1,0 +1,34 @@
+# Odysseus MCP mirror — bind-mounts all 21 AionUi MCP server directories
+# into the container so they can run as stdio subprocesses.
+#
+# Place this file at /opt/aionui/projects/odysseus-sovi/docker-compose.override.yml
+# Docker Compose auto-merges it with docker-compose.yml on every `up`.
+services:
+  odysseus:
+    volumes:
+      # ── MCP server source trees (read-only) ────────────────────────
+      # Mounted at their host-absolute paths so run.sh scripts and
+      # inter-directory references resolve unchanged.
+      - /opt/aionui/mcp-servers:/opt/aionui/mcp-servers:ro
+      - /opt/aionui/.claude/mcp-servers:/opt/aionui/.claude/mcp-servers:ro
+      - /opt/aionui/services/mcp-trading-agents:/opt/aionui/services/mcp-trading-agents:ro
+      - /opt/aionui/services/mcp-openbb:/opt/aionui/services/mcp-openbb:ro
+      - /opt/aionui/services/mcp-letta:/opt/aionui/services/mcp-letta:ro
+      - /opt/aionui/services/mcp-claude-accounts:/opt/aionui/services/mcp-claude-accounts:ro
+      - /opt/aionui/projects/sovereign-memory-bridge:/opt/aionui/projects/sovereign-memory-bridge:ro
+      - /opt/aionui/projects/claude-account-rotator:/opt/aionui/projects/claude-account-rotator:ro
+      # ── Node.js MCP server binaries ────────────────────────────────
+      - /opt/aionui/.npm-global:/opt/aionui/.npm-global:ro
+      # ── API keys resolver (used by github + stripe MCP wrappers) ──
+      - /opt/aionui/.claude/skills/api-keys-resolver:/opt/aionui/.claude/skills/api-keys-resolver:ro
+      # ── Ghost CMS shared module ─────────────────────────────────────
+      - /opt/aionui/projects/ghost-cms:/opt/aionui/projects/ghost-cms:ro
+      # ── Environment / secrets files ────────────────────────────────
+      - /opt/aionui/.env:/opt/aionui/.env:ro
+      - /opt/aionui/projects/mem0-service/.env:/opt/aionui/projects/mem0-service/.env:ro
+      - /etc/sovereign-shared/shared.env:/etc/sovereign-shared/shared.env:ro
+      # ── MCP wrapper scripts (container-compatible launchers) ───────
+      - ./mcp-wrappers:/app/mcp-wrappers:ro
+    environment:
+      # Add host npm-global bin to PATH so node-based MCP servers resolve
+      - PATH=/app/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/aionui/.npm-global/bin

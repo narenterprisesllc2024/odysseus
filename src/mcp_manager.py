@@ -199,7 +199,8 @@ class McpManager:
 
                 # Discover tools
                 tools_result = await session.list_tools()
-            except Exception:
+            except Exception as exc:
+                logger.warning(f"MCP stdio connect error for {name}: {type(exc).__name__}: {exc}")
                 await stack.aclose()
                 raise
             tools = []
@@ -436,13 +437,21 @@ class McpManager:
         finally:
             db.close()
 
-        async def _safe_connect(spec):
-            try:
-                await self.connect_server(**spec)
-            except Exception as e:
-                logger.warning(f"MCP connect failed for {spec['name']}: {e}")
+        # Limit concurrency to avoid anyio cancel-scope conflicts inside
+        # the mcp library when too many stdio_client connections start at once.
+        sem = asyncio.Semaphore(8)
 
-        await asyncio.gather(*[_safe_connect(s) for s in server_specs])
+        async def _safe_connect(spec):
+            async with sem:
+                try:
+                    await self.connect_server(**spec)
+                except BaseException as e:
+                    logger.warning(f"MCP connect failed for {spec['name']}: {type(e).__name__}: {e}")
+
+        await asyncio.gather(
+            *[_safe_connect(s) for s in server_specs],
+            return_exceptions=True,
+        )
 
     async def call_tool(self, qualified_name: str, arguments: Dict) -> Dict:
         """Call an MCP tool by its qualified name (mcp__{server_id}__{tool_name}).

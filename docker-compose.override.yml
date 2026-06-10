@@ -35,6 +35,12 @@ services:
       # container directly (it binds to 127.0.0.1 on the host, so
       # host.docker.internal cannot reach it).
       - penpot
+    # Load API keys from shared.env so MCP wrapper scripts can resolve
+    # credentials even when running as the non-root odysseus user (which
+    # cannot read the bind-mounted shared.env file directly due to group
+    # permissions — host file is root:sovshare 0640).
+    env_file:
+      - /etc/sovereign-shared/shared.env
     environment:
       # Add host npm-global bin to PATH so node-based MCP servers resolve
       - PATH=/app/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/aionui/.npm-global/bin

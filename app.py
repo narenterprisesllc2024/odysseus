@@ -910,6 +910,50 @@ async def _startup_event():
         except BaseException as e:
             logger.warning(f"MCP startup failed (non-critical): {type(e).__name__}: {e}")
 
+        # Retry any MCPs that failed during concurrent startup.
+        # Runs as a separate task so it's outside the wait_for cancel scope.
+        disconnected = [
+            sid for sid, info in mcp_manager.get_all_statuses().items()
+            if info.get("status") == "error" and not mcp_manager.is_builtin(sid)
+        ]
+        if disconnected:
+            async def _retry_failed():
+                import json as _json
+                from src.database import McpServer, SessionLocal
+                for attempt in range(1, 4):
+                    await asyncio.sleep(5 * attempt)  # 5s, 10s, 15s
+                    still_bad = [
+                        sid for sid in disconnected
+                        if mcp_manager.get_server_status(sid).get("status") != "connected"
+                    ]
+                    if not still_bad:
+                        break
+                    logger.info(f"MCP retry attempt {attempt}/3 for {len(still_bad)} server(s)")
+                    db = SessionLocal()
+                    try:
+                        for sid in still_bad:
+                            srv = db.query(McpServer).filter(McpServer.id == sid).first()
+                            if not srv or not srv.is_enabled:
+                                continue
+                            await mcp_manager.disconnect_server(sid)
+                            try:
+                                args = _json.loads(srv.args) if srv.args else []
+                                env = _json.loads(srv.env) if srv.env else {}
+                                ok = await mcp_manager.connect_server(
+                                    server_id=srv.id, name=srv.name,
+                                    transport=srv.transport, command=srv.command,
+                                    args=args, env=env, url=srv.url,
+                                )
+                                if ok:
+                                    logger.info(f"MCP retry succeeded: {srv.name}")
+                                else:
+                                    logger.warning(f"MCP retry failed: {srv.name} (attempt {attempt})")
+                            except BaseException as e:
+                                logger.warning(f"MCP retry error for {srv.name}: {e}")
+                    finally:
+                        db.close()
+            asyncio.create_task(_retry_failed())
+
     _startup_tasks.append(asyncio.create_task(_startup_mcp_connections()))
 
     # Pre-warm the RAG tool index off the request path. Loading the local

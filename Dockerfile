@@ -23,6 +23,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Pre-cache Node MCP servers that would otherwise download on first startup.
+# chrome-devtools-mcp is invoked via npx -y which checks global first.
+RUN npm install -g chrome-devtools-mcp@latest 2>/dev/null || true
+
 # Install Python deps first (layer cache). Optional extras (PyMuPDF AGPL, etc.)
 # are opt-in so the default image stays MIT-core; see requirements-optional.txt.
 ARG INSTALL_OPTIONAL=false

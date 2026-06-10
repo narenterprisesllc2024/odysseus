@@ -341,11 +341,14 @@ class _KokoroPipeline:
 
     # Search paths for model + voices, in priority order
     _MODEL_SEARCH = [
+        "/app/data/kokoro-models/kokoro-v0_19.onnx",
+        "/app/data/kokoro-models/kokoro-v1.0.onnx",
         "/app/kokoro-models/kokoro-v0_19.onnx",
         "/app/kokoro-models/kokoro-v1.0.onnx",
         "/var/lib/kokoro/kokoro-v0_19.onnx",
     ]
     _VOICES_SEARCH = [
+        "/app/data/kokoro-models/voices-v1.0.bin",
         "/app/kokoro-models/voices-v1.0.bin",
         "/var/lib/kokoro/voices-v1.0.bin",
     ]

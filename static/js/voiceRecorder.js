@@ -23,6 +23,9 @@ let _browserTranscript = '';
 // Cached STT provider — refreshed on settings change
 let _sttProvider = 'disabled';
 
+// Voice mode: when true, transcriptions auto-submit and TTS auto-plays
+let _voiceMode = true;
+
 /**
  * Fetch current STT provider from server settings
  */
@@ -128,7 +131,10 @@ async function transcribeOnServer(audioBlob) {
 }
 
 /**
- * Insert transcribed text into the chat input
+ * Insert transcribed text into the chat input and optionally auto-submit.
+ * When voice mode is active (recording triggered from mic button),
+ * the transcription is auto-submitted and TTS auto-play is enabled
+ * so the AI response is read aloud.
  */
 function insertTranscription(text, showToast) {
   if (!text) return;
@@ -143,6 +149,21 @@ function insertTranscription(text, showToast) {
   input.focus();
 
   if (showToast) showToast('Transcribed');
+
+  // Voice mode: auto-submit + enable TTS auto-play for the response
+  if (_voiceMode) {
+    // Enable TTS auto-play so the response is read aloud
+    if (window.aiTTSManager && window.aiTTSManager.available) {
+      window.aiTTSManager.autoPlay = true;
+    }
+    // Auto-submit after a brief delay (let input event propagate)
+    setTimeout(() => {
+      const sendBtn = document.querySelector('.send-btn');
+      if (sendBtn && input.value.trim()) {
+        sendBtn.click();
+      }
+    }, 100);
+  }
 }
 
 /**
@@ -278,6 +299,8 @@ const voiceRecorderModule = {
   refreshSttProvider,
   get _sttProvider() { return _sttProvider; },
   set _sttProvider(v) { _sttProvider = v; },
+  get voiceMode() { return _voiceMode; },
+  set voiceMode(v) { _voiceMode = v; },
 };
 
 export default voiceRecorderModule;

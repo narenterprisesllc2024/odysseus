@@ -408,26 +408,41 @@ class McpManager:
             await self.disconnect_server(sid)
 
     async def connect_all_enabled(self):
-        """Connect to all enabled MCP servers from the database."""
+        """Connect to all enabled MCP servers from the database.
+
+        Runs all connections concurrently via asyncio.gather so the total
+        startup time is max(individual) rather than sum(all).  Each
+        connection is individually wrapped so one failure cannot cancel
+        the rest.
+        """
+        import asyncio
         from src.database import McpServer, SessionLocal
 
         db = SessionLocal()
         try:
             servers = db.query(McpServer).filter(McpServer.is_enabled == True).all()
+            # Snapshot DB rows before closing the session
+            server_specs = []
             for srv in servers:
-                args = json.loads(srv.args) if srv.args else []
-                env = json.loads(srv.env) if srv.env else {}
-                await self.connect_server(
-                    server_id=srv.id,
-                    name=srv.name,
-                    transport=srv.transport,
-                    command=srv.command,
-                    args=args,
-                    env=env,
-                    url=srv.url,
-                )
+                server_specs.append({
+                    "server_id": srv.id,
+                    "name": srv.name,
+                    "transport": srv.transport,
+                    "command": srv.command,
+                    "args": json.loads(srv.args) if srv.args else [],
+                    "env": json.loads(srv.env) if srv.env else {},
+                    "url": srv.url,
+                })
         finally:
             db.close()
+
+        async def _safe_connect(spec):
+            try:
+                await self.connect_server(**spec)
+            except Exception as e:
+                logger.warning(f"MCP connect failed for {spec['name']}: {e}")
+
+        await asyncio.gather(*[_safe_connect(s) for s in server_specs])
 
     async def call_tool(self, qualified_name: str, arguments: Dict) -> Dict:
         """Call an MCP tool by its qualified name (mcp__{server_id}__{tool_name}).

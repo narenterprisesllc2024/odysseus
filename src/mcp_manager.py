@@ -186,7 +186,7 @@ class McpManager:
             server_params = StdioServerParameters(
                 command=command,
                 args=args,
-                env={**os.environ, **env} if env else None,
+                env={**os.environ, **(env or {})},
             )
 
             stack = AsyncExitStack()

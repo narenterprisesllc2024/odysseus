@@ -41,5 +41,12 @@ mcp
 pyotp
 qrcode[pil]
 croniter
+# Local STT via faster-whisper (CTranslate2-based Whisper, CPU or CUDA).
+# Moved from requirements-optional.txt — core dep for voice surface.
+faster-whisper
+# Local TTS via Kokoro-82M ONNX (CPU, no CUDA required).
+# Model files bind-mounted from host /var/lib/kokoro/.
+kokoro-onnx
+soundfile
 pytest
 pytest-asyncio

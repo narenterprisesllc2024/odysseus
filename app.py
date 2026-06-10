@@ -42,8 +42,8 @@ from datetime import datetime
 from typing import Dict
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -172,7 +172,7 @@ if AUTH_ENABLED:
         "/api/version",
         "/login",
     }
-    AUTH_EXEMPT_PREFIXES = ["/static"]
+    AUTH_EXEMPT_PREFIXES = ["/static", "/sw.js", "/service-worker.js"]
     # Dynamic paths whose own handler proves identity via a path-embedded
     # secret instead of the session/bearer auth. The route handler at
     # routes/task_routes.py validates the per-task `webhook_token` itself
@@ -740,6 +740,27 @@ async def serve_index(request: Request):
     if os.path.exists(root_path):
         return _serve_html_with_nonce(request, root_path)
     raise HTTPException(404, "index.html not found")
+
+# Kill-switch routes for any stale Sovi service worker registered at root paths
+# (months-old "Sovi" install pre-AionUi era). These serve a SW that unregisters
+# itself + clears all caches on activate.
+async def _serve_sw_killswitch():
+    sw_path = abs_join(BASE_DIR, "static/sw-killswitch.js")
+    if not os.path.exists(sw_path):
+        raise HTTPException(404, "killswitch not found")
+    with open(sw_path, "rb") as f:
+        body = f.read()
+    return Response(content=body, media_type="application/javascript",
+                    headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache",
+                             "X-Content-Type-Options": "nosniff"})
+
+@app.get("/sw.js")
+async def serve_sw_killswitch_root():
+    return await _serve_sw_killswitch()
+
+@app.get("/service-worker.js")
+async def serve_sw_killswitch_alt():
+    return await _serve_sw_killswitch()
 
 @app.get("/notes")
 async def serve_notes(request: Request):

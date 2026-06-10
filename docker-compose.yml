@@ -19,6 +19,9 @@ services:
       # AionUi skill library — mounted read-only so Odysseus can discover
       # and surface all 333+ skills without duplicating files on disk.
       - ${AIONUI_SKILLS_PATH:-/opt/aionui/.claude/skills}:/app/aionui-skills:ro,z
+      # Kokoro-82M ONNX TTS model files — shared with host voice-api.
+      # Read-only; model is ~330 MB, voices ~28 MB.
+      - /var/lib/kokoro:/app/kokoro-models:ro
     extra_hosts:
       # Lets the container reach local services on the Docker host, including
       # Ollama at http://host.docker.internal:11434.

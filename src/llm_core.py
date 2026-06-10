@@ -674,12 +674,22 @@ def _build_anthropic_payload(model, messages, temperature, max_tokens, stream=Fa
     return payload
 
 def _build_anthropic_headers(headers):
-    """Convert Bearer auth to x-api-key for Anthropic."""
+    """Merge caller headers into Anthropic defaults.
+
+    OAuth tokens (sk-ant-oat*) stay as Bearer + beta header.
+    Regular API keys get converted from Bearer to x-api-key.
+    """
     h = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
     if headers:
         for k, v in headers.items():
             if k.lower() == "authorization" and isinstance(v, str) and v.startswith("Bearer "):
-                h["x-api-key"] = v[7:]
+                token = v[7:]
+                if token.startswith("sk-ant-oat"):
+                    # OAuth — keep Bearer auth, add beta flag
+                    h["Authorization"] = v
+                    h["anthropic-beta"] = "oauth-2025-04-20"
+                else:
+                    h["x-api-key"] = token
             else:
                 h[k] = v
     return h

@@ -191,7 +191,12 @@ def build_headers(api_key: Optional[str], base: str) -> Dict[str, str]:
     headers: Dict[str, str] = {}
     if provider == "anthropic":
         if api_key:
-            headers["x-api-key"] = api_key
+            if api_key.startswith("sk-ant-oat"):
+                # Claude Max OAuth token — Bearer auth + beta flag
+                headers["Authorization"] = f"Bearer {api_key}"
+                headers["anthropic-beta"] = "oauth-2025-04-20"
+            else:
+                headers["x-api-key"] = api_key
         headers["anthropic-version"] = "2023-06-01"
         return headers
     if provider == "copilot":

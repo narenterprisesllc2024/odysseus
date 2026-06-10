@@ -624,7 +624,12 @@ def _probe_endpoint(base_url: str, api_key: str = None, timeout: int = 5) -> Lis
         url = build_models_url(base)
         headers = {"anthropic-version": "2023-06-01"}
         if api_key:
-            headers["x-api-key"] = api_key
+            if api_key.startswith("sk-ant-oat"):
+                # OAuth token — Bearer auth + beta flag
+                headers["Authorization"] = f"Bearer {api_key}"
+                headers["anthropic-beta"] = "oauth-2025-04-20"
+            else:
+                headers["x-api-key"] = api_key
         try:
             r = httpx.get(url, headers=headers, timeout=timeout, verify=llm_verify())
             r.raise_for_status()

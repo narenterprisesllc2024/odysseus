@@ -238,7 +238,12 @@ class ToolIndex:
         logger.info(f"Indexed {len(docs)} built-in tools")
 
     def index_mcp_tools(self, mcp_mgr, disabled_map: Optional[Dict] = None):
-        """Index MCP tool descriptions. Call after MCP servers connect/disconnect."""
+        """Index MCP tool descriptions into ChromaDB for RAG retrieval.
+
+        Uses mcp_mgr.get_all_tools() directly for full descriptions
+        (not the truncated prompt text), giving better embedding quality.
+        Call after MCP servers connect/disconnect.
+        """
         if not mcp_mgr:
             return
 
@@ -256,39 +261,58 @@ class ToolIndex:
             except Exception:
                 pass
 
-        # Get current MCP tools
+        # Get structured tool data directly from the manager.
+        # This gives us full descriptions (not truncated at 120 chars
+        # like get_tool_descriptions_for_prompt()) and structured metadata.
         try:
-            all_tools = mcp_mgr.get_tool_descriptions_for_prompt(disabled_map or {})
+            all_tools = mcp_mgr.get_all_tools(disabled_map or {})
         except Exception:
-            all_tools = ""
+            all_tools = []
 
         if not all_tools:
             self._mcp_generation = gen
             return
 
-        # Parse MCP tool descriptions from the prompt text
         docs = []
         ids = []
         metadatas = []
-        current_server = ""
-        for line in all_tools.strip().split("\n"):
-            line = line.strip()
-            # Track which server section we're in (for context in descriptions)
-            if line.startswith("**") and line.endswith(":**"):
-                current_server = line.strip("*: ")
-            elif line.startswith("- ") and ":" in line:
-                # Format: "- tool_name: description"
-                name_desc = line[2:].split(":", 1)
-                if len(name_desc) == 2:
-                    name = name_desc[0].strip()
-                    desc = name_desc[1].strip()
-                    # Include server identity in the indexed text so RAG can
-                    # distinguish "list_emails for server-a" from "list_emails for server-b"
-                    server_ctx = f" (server: {current_server})" if current_server else ""
-                    doc_text = f"Tool: {name}{server_ctx}\n{desc}"
-                    docs.append(doc_text)
-                    ids.append(f"mcp_{name}")
-                    metadatas.append({"tool_name": name, "tool_type": "mcp"})
+        seen_qualified = set()
+
+        for t in all_tools:
+            # Skip builtin Python MCP servers — they're already in BUILTIN_TOOL_DESCRIPTIONS.
+            # But include NPX-based builtins like browser.
+            server_id = t.get("server_id", "")
+            if mcp_mgr.is_builtin(server_id) and server_id != "builtin_browser":
+                continue
+            if t.get("is_disabled"):
+                continue
+
+            qualified_name = t.get("qualified_name", "")
+            if not qualified_name or qualified_name in seen_qualified:
+                continue
+            seen_qualified.add(qualified_name)
+
+            server_name = t.get("server_name", "")
+            description = t.get("description", "")
+            tool_name = t.get("name", "")
+
+            # Build a rich document for embedding: include qualified name,
+            # server context, tool name, and full description.
+            # The qualified_name format is mcp__{server_id}__{tool_name}.
+            doc_text = f"Tool: {qualified_name} (server: {server_name})\n"
+            if tool_name != qualified_name:
+                doc_text += f"Also known as: {tool_name}\n"
+            doc_text += description
+
+            docs.append(doc_text)
+            ids.append(f"mcp_{qualified_name}")
+            metadatas.append({
+                "tool_name": qualified_name,
+                "tool_type": "mcp",
+                "server_id": server_id,
+                "server_name": server_name,
+                "short_name": tool_name,
+            })
 
         if not docs:
             self._mcp_generation = gen
@@ -310,7 +334,7 @@ class ToolIndex:
             logger.warning("MCP tool indexing failed in all embedding lanes")
             return
         self._mcp_generation = gen
-        logger.info(f"Indexed {len(docs)} MCP tools")
+        logger.info(f"Indexed {len(docs)} MCP tools from {len(seen_qualified)} unique endpoints")
 
     def retrieve(self, query: str, k: int = 8) -> List[str]:
         """Retrieve the top-K most relevant tool names for a query."""

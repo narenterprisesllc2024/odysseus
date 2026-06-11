@@ -954,8 +954,7 @@ async def _startup_event():
                         db.close()
             asyncio.create_task(_retry_failed())
 
-    _mcp_startup_task = asyncio.create_task(_startup_mcp_connections())
-    _startup_tasks.append(_mcp_startup_task)
+    _startup_tasks.append(asyncio.create_task(_startup_mcp_connections()))
 
     # Pre-warm the RAG tool index off the request path. Loading the local
     # embedding model + opening ChromaDB + indexing the built-in tools is a
@@ -973,28 +972,6 @@ async def _startup_event():
             logger.warning(f"Tool index warmup failed (non-critical): {type(e).__name__}: {e}")
 
     _startup_tasks.append(asyncio.create_task(_warmup_tool_index()))
-
-    # Pre-index MCP tools into ChromaDB after servers connect.
-    # Without this, MCP tools are only indexed lazily on the first agent
-    # request, adding latency and potentially missing tools.
-    async def _preindex_mcp_tools():
-        try:
-            await _mcp_startup_task
-        except Exception:
-            pass  # MCP startup failures are non-critical
-        try:
-            from src.tool_index import get_tool_index
-            idx = await asyncio.to_thread(get_tool_index)
-            if idx and mcp_manager:
-                await asyncio.to_thread(idx.index_mcp_tools, mcp_manager)
-                statuses = mcp_manager.get_all_statuses()
-                connected = sum(1 for s in statuses.values() if s.get("status") == "connected")
-                logger.info("[startup] MCP tools pre-indexed into ChromaDB (%d/%d servers connected)",
-                           connected, len(statuses))
-        except Exception as e:
-            logger.warning(f"MCP tool pre-indexing failed (non-critical): {type(e).__name__}: {e}")
-
-    _startup_tasks.append(asyncio.create_task(_preindex_mcp_tools()))
     # Warmup: ping all known LLM endpoints to prime connections
     async def _warmup_endpoints():
         try:

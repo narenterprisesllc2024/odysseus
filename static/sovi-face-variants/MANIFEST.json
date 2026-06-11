@@ -1,0 +1,24 @@
+{
+  "purpose": "Sovi face expression + viseme frames for speaking animation",
+  "source": "_source-sheet.jpg (1536x1024 master, 6x2 grid, original from Nate's Google Photos album 2026-06-11)",
+  "frame_size": "256x310",
+  "expressions": {
+    "neutral": "neutral.png",
+    "smile": "smile.png",
+    "happy": "happy.png",
+    "surprised": "surprised.png",
+    "thoughtful": "thoughtful.png",
+    "wink": "wink.png"
+  },
+  "visemes": {
+    "A": "talking-a.png",
+    "E": "talking-e.png",
+    "I": "talking-i.png",
+    "O": "talking-o.png",
+    "U": "talking-u.png",
+    "M": "talking-m.png"
+  },
+  "default_idle": "neutral.png",
+  "speaking_default_loop": ["talking-a.png", "talking-e.png", "talking-i.png", "talking-o.png", "talking-u.png", "talking-m.png"],
+  "notes": "Visemes A/E/I/O/U/M map to standard phoneme groups. M doubles as closed-mouth/consonant frame. For lip-sync, drive frame selection from TTS phoneme stream (Kokoro outputs phoneme timings)."
+}

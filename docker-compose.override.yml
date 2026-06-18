@@ -29,6 +29,11 @@ services:
       - /etc/sovereign-shared/shared.env:/etc/sovereign-shared/shared.env:ro
       # ── MCP wrapper scripts (container-compatible launchers) ───────
       - ./mcp-wrappers:/app/mcp-wrappers:ro
+      # ── Shared memory (tracker, persona, sync state) — RW ──────────
+      # Tracker route reads/writes tracker_active_execution.md +
+      # tracker_daily_state.json. Host dir is owned aionui:aionui (UID 995/GID 988)
+      # which matches the container's PUID/PGID, so writes round-trip cleanly.
+      - /opt/aionui/SHARED_MEMORY:/opt/aionui/SHARED_MEMORY
     networks:
       - default
       # Join the Penpot network so Odysseus can reach the Penpot MCP

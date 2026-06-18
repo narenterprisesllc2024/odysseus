@@ -27,10 +27,10 @@ ARCHIVE_MARKER = "## 📚 ARCHIVE"
 
 SECTIONS = [
     {"id": "north_star", "emoji": "🌟", "title": "North Star", "subtitle": "multi-year horizon"},
-    {"id": "this_month", "emoji": "🎯", "title": "This Month", "subtitle": "30-day priorities"},
-    {"id": "this_week", "emoji": "⚡", "title": "This Week", "subtitle": "7-day priorities"},
-    {"id": "today", "emoji": "✅", "title": "Today", "subtitle": "3-5 high-leverage items"},
     {"id": "daily_rhythm", "emoji": "🔁", "title": "Daily Rhythm", "subtitle": "resets at midnight"},
+    {"id": "today", "emoji": "✅", "title": "Today", "subtitle": "the 3 highest-leverage right now"},
+    {"id": "this_week", "emoji": "⚡", "title": "This Week", "subtitle": "next-up — auto-promotes to today"},
+    {"id": "this_month", "emoji": "🎯", "title": "This Month", "subtitle": "30-day priorities"},
 ]
 
 _LOCK = threading.Lock()
@@ -156,6 +156,71 @@ def _toggle_line(item_label: str, section_id: str, want_checked: bool) -> bool:
     return True
 
 
+def _toggle_today_with_promote(item_label: str, want_checked: bool):
+    """Flip a Today checkbox; if checking, also promote first unchecked This Week
+    item up into Today (it moves from Week to Today). Returns (changed, promoted_label_or_None).
+    Single file rewrite — atomic under the route's lock.
+    """
+    full = _read_full()
+    active_end = full.find(ARCHIVE_MARKER)
+    active = full if active_end == -1 else full[:active_end]
+    archive = "" if active_end == -1 else full[active_end:]
+    lines = active.splitlines()
+
+    today_emoji = "✅"
+    week_emoji = "⚡"
+
+    # Pass 1 — flip the Today item + remember the last Today checkbox index
+    in_today = False
+    today_last_checkbox_idx = -1
+    today_changed = False
+    for i, line in enumerate(lines):
+        if line.startswith("## "):
+            in_today = today_emoji in line
+            continue
+        if not in_today:
+            continue
+        m = _CHECKBOX_RE.match(line.rstrip())
+        if not m:
+            continue
+        today_last_checkbox_idx = i
+        if m.group(2) == item_label:
+            currently = m.group(1).lower() == "x"
+            if currently == want_checked:
+                continue
+            new_box = "[x]" if want_checked else "[ ]"
+            lines[i] = f"- {new_box} {item_label}"
+            today_changed = True
+
+    if not today_changed:
+        return False, None
+
+    # Pass 2 — if checking, promote first unchecked Week item into Today
+    promoted = None
+    if want_checked:
+        in_week = False
+        for i, line in enumerate(lines):
+            if line.startswith("## "):
+                in_week = week_emoji in line
+                continue
+            if not in_week:
+                continue
+            m = _CHECKBOX_RE.match(line.rstrip())
+            if not m or m.group(1).lower() == "x":
+                continue
+            promoted = m.group(2)
+            # Today is ABOVE Week in file, so popping from Week never shifts today_last_checkbox_idx
+            lines.pop(i)
+            lines.insert(today_last_checkbox_idx + 1, f"- [ ] {promoted}")
+            break
+
+    new_active = "\n".join(lines)
+    if archive and not new_active.endswith("\n"):
+        new_active += "\n"
+    TRACKER_PATH.write_text(new_active + archive)
+    return True, promoted
+
+
 class ToggleBody(BaseModel):
     section_id: str
     item_label: str
@@ -189,6 +254,9 @@ def setup_tracker_routes() -> APIRouter:
                         state.pop(item_id, None)
                     _save_daily_state(state)
                     return {"ok": True, "daily_rhythm": True, "checked": body.checked}
+                if body.section_id == "today" and body.checked:
+                    changed, promoted = _toggle_today_with_promote(body.item_label, True)
+                    return {"ok": True, "changed": changed, "checked": True, "promoted": promoted}
                 changed = _toggle_line(body.item_label, body.section_id, body.checked)
                 return {"ok": True, "changed": changed, "checked": body.checked}
             except Exception as e:

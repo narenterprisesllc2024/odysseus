@@ -110,10 +110,14 @@
             credentials: "same-origin",
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json().catch(() => ({}));
           const li = cb.closest("li.item");
           if (li) li.classList.toggle("checked", want);
-          toast(want ? "checked" : "unchecked");
-          // Auto-reload to refresh "next up" + counts
+          if (data.promoted) {
+            toast(`done — promoted to today: ${data.promoted.replace(/\*\*/g, "").slice(0, 60)}`);
+          } else {
+            toast(want ? "checked" : "unchecked");
+          }
           setTimeout(load, 250);
         } catch (e) {
           cb.checked = !want;

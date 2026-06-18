@@ -589,6 +589,10 @@ app.include_router(setup_model_routes(model_discovery))
 from routes.copilot_routes import setup_copilot_routes
 app.include_router(setup_copilot_routes())
 
+# Tracker — 4-tier execution checklist with checkbox writeback
+from routes.tracker_routes import setup_tracker_routes
+app.include_router(setup_tracker_routes())
+
 # TTS
 from routes.tts_routes import setup_tts_routes
 app.include_router(setup_tts_routes(tts_service))
@@ -802,6 +806,11 @@ async def serve_library(request: Request):
 async def serve_backgrounds(request: Request):
     """Sandbox page for prototyping background effects. No auth required."""
     return _serve_html_with_nonce(request, abs_join(BASE_DIR, "static/backgrounds.html"))
+
+@app.get("/tracker")
+async def serve_tracker(request: Request):
+    """4-tier execution tracker UI — reads/writes tracker_active_execution.md."""
+    return _serve_html_with_nonce(request, abs_join(BASE_DIR, "static/tracker.html"))
 
 @app.get("/login")
 async def serve_login(request: Request):

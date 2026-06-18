@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tracker · Sovi</title>
+  <link rel="icon" href="/static/icon-192.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { background: var(--bg, #02100D); color: var(--fg, #E8F4F2); margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+    .tracker-wrap { max-width: 880px; margin: 0 auto; padding: 32px 24px 80px; }
+    .tracker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; gap: 16px; flex-wrap: wrap; }
+    .tracker-title { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+    .tracker-meta { font-size: 12px; color: var(--color-muted, #888); display: flex; gap: 14px; align-items: center; }
+    .tracker-meta a { color: var(--color-accent, #10A9FA); text-decoration: none; }
+    .tracker-meta a:hover { text-decoration: underline; }
+    .section { background: var(--panel, #0B2925); border: 1px solid var(--border, #1D3637); border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .section-name { font-size: 17px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+    .section-sub { font-size: 11px; color: var(--color-muted, #888); text-transform: uppercase; letter-spacing: 0.06em; }
+    .section-count { font-size: 12px; color: var(--color-muted-alt, #6b7280); font-variant-numeric: tabular-nums; }
+    ul.items { list-style: none; padding: 0; margin: 0; }
+    li.item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.04); }
+    li.item:first-child { border-top: none; }
+    li.item label { flex: 1; cursor: pointer; line-height: 1.45; user-select: none; }
+    li.item input[type=checkbox] { appearance: none; min-width: 18px; height: 18px; margin-top: 2px; border: 1.5px solid var(--border, #1D3637); border-radius: 4px; background: transparent; cursor: pointer; position: relative; transition: all 0.12s ease; }
+    li.item input[type=checkbox]:hover { border-color: var(--color-accent, #10A9FA); }
+    li.item input[type=checkbox]:checked { background: var(--color-accent, #10A9FA); border-color: var(--color-accent, #10A9FA); }
+    li.item input[type=checkbox]:checked::after { content: "✓"; position: absolute; top: -2px; left: 2px; color: #0B2925; font-weight: 700; font-size: 14px; line-height: 1; }
+    li.item.checked label { color: var(--color-muted-alt, #6b7280); text-decoration: line-through; text-decoration-thickness: 1px; }
+    .add-row { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .add-row input { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--border, #1D3637); color: var(--fg, #E8F4F2); padding: 7px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; }
+    .add-row input:focus { outline: none; border-color: var(--color-accent, #10A9FA); }
+    .add-row button { background: transparent; border: 1px solid var(--border, #1D3637); color: var(--color-muted, #888); padding: 7px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .add-row button:hover { color: var(--color-accent, #10A9FA); border-color: var(--color-accent, #10A9FA); }
+    .next-up { background: rgba(16, 169, 250, 0.07); border-left: 3px solid var(--color-accent, #10A9FA); padding: 6px 10px; margin: 6px 0 12px; font-size: 13px; border-radius: 4px; }
+    .next-up strong { color: var(--color-accent, #10A9FA); }
+    .empty { color: var(--color-muted-alt, #6b7280); font-style: italic; font-size: 13px; padding: 8px 0; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel, #0B2925); border: 1px solid var(--border, #1D3637); padding: 10px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: all 0.2s ease; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { border-color: var(--color-error, #ff4444); color: var(--color-error-light, #ff6666); }
+    .progress-bar { height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .progress-fill { height: 100%; background: var(--color-accent, #10A9FA); transition: width 0.3s ease; }
+    .section[data-section-id="daily_rhythm"] { background: linear-gradient(180deg, rgba(80, 250, 123, 0.04), var(--panel, #0B2925)); border-color: rgba(80, 250, 123, 0.2); }
+    .section[data-section-id="today"] { border-color: rgba(16, 169, 250, 0.35); box-shadow: 0 0 0 1px rgba(16, 169, 250, 0.15); }
+    .section[data-section-id="north_star"] .section-name { color: #f0ad4e; }
+    @media (max-width: 600px) {
+      .tracker-wrap { padding: 20px 14px 60px; }
+      .tracker-title { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="tracker-wrap">
+    <div class="tracker-header">
+      <div>
+        <div class="tracker-title">Tracker</div>
+        <div class="tracker-meta">
+          <span id="today-label"></span>
+          <a href="/">← back to Sovi</a>
+          <a href="#" id="refresh-btn">refresh</a>
+        </div>
+      </div>
+    </div>
+    <div id="sections"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="/static/tracker.js"></script>
+</body>
+</html>
